@@ -89,7 +89,11 @@ $(error DOCKER_IMAGE_NAME value is not set)
 endif
 
 .PHONY: all build client client-watch docker lint test dependencies clean release docker-multi-arch
-all: build
+all: init build
+
+init:
+	git config core.hooksPath .githooks
+	chmod +x .githooks/pre-commit
 
 build: dependencies client
 	PATH=$(GOPATH)/bin:$(PATH) go generate ./...
