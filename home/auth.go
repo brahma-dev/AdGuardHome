@@ -388,7 +388,8 @@ func optionalAuth(handler func(http.ResponseWriter, *http.Request)) func(http.Re
 				}
 			}
 
-		} else if strings.HasPrefix(r.URL.Path, "/assets/") ||
+		} else if strings.HasPrefix(r.URL.Path, "/home.html") ||
+			strings.HasPrefix(r.URL.Path, "/assets/") ||
 			strings.HasPrefix(r.URL.Path, "/login.") {
 			// process as usual
 			// no additional auth requirements
@@ -426,7 +427,7 @@ func optionalAuth(handler func(http.ResponseWriter, *http.Request)) func(http.Re
 						log.Debug("Auth: redirected to login page by GL-Inet submodule")
 
 					} else {
-						w.Header().Set("Location", "/login.html")
+						w.Header().Set("Location", "/home.html")
 						w.WriteHeader(http.StatusFound)
 					}
 				} else {

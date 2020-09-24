@@ -14,6 +14,7 @@ const ENTRY_LOGIN = path.resolve(RESOURCES_PATH, 'src/login/index.js');
 const HTML_PATH = path.resolve(RESOURCES_PATH, 'public/index.html');
 const HTML_INSTALL_PATH = path.resolve(RESOURCES_PATH, 'public/install.html');
 const HTML_LOGIN_PATH = path.resolve(RESOURCES_PATH, 'public/login.html');
+const HTML_HOME_PATH = path.resolve(RESOURCES_PATH, 'public/home.html');
 const ASSETS_PATH = path.resolve(RESOURCES_PATH, 'public/assets');
 
 const PUBLIC_PATH = path.resolve(__dirname, '../build/static');
@@ -130,6 +131,13 @@ const config = {
             chunks: ['login'],
             filename: 'login.html',
             template: HTML_LOGIN_PATH,
+        }),
+        new HtmlWebpackPlugin({
+            inject: true,
+            cache: false,
+            chunks: ['home'],
+            filename: 'home.html',
+            template: HTML_HOME_PATH,
         }),
         new MiniCssExtractPlugin({
             filename: isDev ? '[name].css' : '[name].[hash].css',
