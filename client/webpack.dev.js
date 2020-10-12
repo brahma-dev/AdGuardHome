@@ -38,11 +38,13 @@ const getDevServerConfig = (proxyUrl = BASE_URL) => {
 
     return {
         hot: true,
+        open: true,
         host: devServerHost,
         port: devServerPort,
         proxy: {
             [proxyUrl]: `http://${devServerHost}:${port}`,
         },
+        open: true,
     };
 };
 
@@ -61,5 +63,5 @@ module.exports = merge(common, {
             },
         ],
     },
-    devServer: process.env.WEBPACK_DEV_SERVER ? getDevServerConfig(BASE_URL) : undefined,
+    ...(process.env.WEBPACK_DEV_SERVER ? { devServer: getDevServerConfig(BASE_URL) } : undefined),
 });

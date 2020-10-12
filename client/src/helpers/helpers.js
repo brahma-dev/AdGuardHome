@@ -16,6 +16,7 @@ import { getTrackerData } from './trackers/trackers';
 import {
     ADDRESS_TYPES,
     CHECK_TIMEOUT,
+    COMMENT_LINE_DEFAULT_TOKEN,
     CUSTOM_FILTERING_RULES_ID,
     DEFAULT_DATE_FORMAT_OPTIONS,
     DEFAULT_LANGUAGE,
@@ -24,7 +25,7 @@ import {
     DHCP_VALUES_PLACEHOLDERS,
     FILTERED,
     FILTERED_STATUS,
-    IP_MATCH_LIST_STATUS,
+    SERVICES_ID_NAME_MAP,
     STANDARD_DNS_PORT,
     STANDARD_HTTPS_PORT,
     STANDARD_WEB_PORT,
@@ -46,12 +47,8 @@ export const formatTime = (time, options = DEFAULT_TIME_FORMAT) => {
  * @returns {string} Returns the date and time in the specified format
  */
 export const formatDateTime = (dateTime, options = DEFAULT_DATE_FORMAT_OPTIONS) => {
-    const { language } = navigator;
-    const currentLanguage = (language.slice(0, 2) === 'en' || !language) ? 'en-GB' : language;
-
     const parsedTime = new Date(dateTime);
-
-    return parsedTime.toLocaleString(currentLanguage, options);
+    return parsedTime.toLocaleString(navigator.language, options);
 };
 
 /**
@@ -131,16 +128,14 @@ export const normalizeTopStats = (stats) => (
     }))
 );
 
-export const addClientInfo = (data, clients, param) => (
-    data.map((row) => {
-        const clientIp = row[param];
-        const info = clients.find((item) => item[clientIp]) || '';
-        return {
-            ...row,
-            info: info?.[clientIp] ?? '',
-        };
-    })
-);
+export const addClientInfo = (data, clients, param) => data.map((row) => {
+    const clientIp = row[param];
+    const info = clients.find((item) => item[clientIp]) || '';
+    return {
+        ...row,
+        info: info?.[clientIp] ?? '',
+    };
+});
 
 export const normalizeFilters = (filters) => (
     filters ? filters.map((filter) => {
@@ -315,6 +310,12 @@ export const trimMultilineString = (text) => splitByNewLine(text)
  */
 export const removeEmptyLines = (text) => splitByNewLine(text)
     .join('\n');
+
+/**
+ * @param {string} input
+ * @returns {string}
+ */
+export const trimLinesAndRemoveEmpty = (input) => input.split('\n').map((line) => line.trim()).filter(Boolean).join('\n');
 
 /**
  * Normalizes the topClients array
@@ -523,75 +524,6 @@ export const isIpInCidr = (ip, cidr) => {
 };
 
 /**
- * The purpose of this method is to quickly check
- * if this IP can possibly be in the specified CIDR range.
- *
- * @param ip {string}
- * @param listItem {string}
- * @returns {boolean}
- */
-const isIpQuickMatchCIDR = (ip, listItem) => {
-    const ipv6 = ip.indexOf(':') !== -1;
-    const cidrIpv6 = listItem.indexOf(':') !== -1;
-    if (ipv6 !== cidrIpv6) {
-        // CIDR is for a different IP type
-        return false;
-    }
-
-    if (cidrIpv6) {
-        // We don't do quick check for IPv6 addresses
-        return true;
-    }
-
-    const idx = listItem.indexOf('/');
-    if (idx === -1) {
-        // Not a CIDR, return false immediately
-        return false;
-    }
-
-    const cidrIp = listItem.substring(0, idx);
-    const cidrRange = parseInt(listItem.substring(idx + 1), 10);
-    if (Number.isNaN(cidrRange)) {
-        // Not a valid CIDR
-        return false;
-    }
-
-    const parts = cidrIp.split('.');
-    if (parts.length !== 4) {
-        // Invalid IP, return immediately
-        return false;
-    }
-
-    // Now depending on the range we check if the IP can possibly be in that range
-    if (cidrRange < 8) {
-        // Use the slow approach
-        return true;
-    }
-
-    if (cidrRange < 16) {
-        // Check the first part
-        // Example: 0.0.0.0/8 matches 0.*.*.*
-        return ip.indexOf(`${parts[0]}.`) === 0;
-    }
-
-    if (cidrRange < 24) {
-        // Check the first two parts
-        // Example: 0.0.0.0/16 matches 0.0.*.*
-        return ip.indexOf(`${parts[0]}.${parts[1]}.`) === 0;
-    }
-
-    if (cidrRange <= 32) {
-        // Check the first two parts
-        // Example: 0.0.0.0/16 matches 0.0.*.*
-        return ip.indexOf(`${parts[0]}.${parts[1]}.${parts[2]}.`) === 0;
-    }
-
-    // range for IPv4 CIDR cannot be more than 32
-    // no need to check further, this CIDR is invalid
-    return false;
-};
-
-/**
  *
  * @param ipOrCidr
  * @returns {'IP' | 'CIDR' | 'UNKNOWN'}
@@ -611,50 +543,6 @@ export const findAddressType = (address) => {
         return ADDRESS_TYPES.UNKNOWN;
     } catch (e) {
         return ADDRESS_TYPES.UNKNOWN;
-    }
-};
-
-/**
- * @param ip {string}
- * @param list {string}
- * @returns {'EXACT' | 'CIDR' | 'NOT_FOND'}
- */
-export const getIpMatchListStatus = (ip, list) => {
-    if (!ip || !list) {
-        return IP_MATCH_LIST_STATUS.NOT_FOUND;
-    }
-
-    const listArr = list.trim()
-        .split('\n');
-
-    try {
-        for (let i = 0; i < listArr.length; i += 1) {
-            const listItem = listArr[i];
-
-            if (ip === listItem.trim()) {
-                return IP_MATCH_LIST_STATUS.EXACT;
-            }
-
-            // Using ipaddr.js is quite slow so we first do a quick check
-            // to see if it's possible that this IP may be in the specified CIDR range
-            if (isIpQuickMatchCIDR(ip, listItem)) {
-                const parsedIp = ipaddr.parse(ip);
-                const isItemAnIp = ipaddr.isValid(listItem);
-                const parsedItem = isItemAnIp ? ipaddr.parse(listItem) : ipaddr.parseCIDR(listItem);
-
-                if (isItemAnIp && parsedIp.toString() === parsedItem.toString()) {
-                    return IP_MATCH_LIST_STATUS.EXACT;
-                }
-
-                if (!isItemAnIp && isIpMatchCidr(parsedIp, parsedItem)) {
-                    return IP_MATCH_LIST_STATUS.CIDR;
-                }
-            }
-        }
-        return IP_MATCH_LIST_STATUS.NOT_FOUND;
-    } catch (e) {
-        console.error(e);
-        return IP_MATCH_LIST_STATUS.NOT_FOUND;
     }
 };
 
@@ -717,13 +605,17 @@ export const setHtmlLangAttr = (language) => {
  * @param values {object}
  * @returns {object}
  */
-export const selectCompletedFields = (values) => Object.entries(values)
+export const replaceEmptyStringsWithZeroes = (values) => Object.entries(values)
     .reduce((acc, [key, value]) => {
-        if (value || value === 0) {
-            acc[key] = value;
-        }
+        acc[key] = value === '' ? 0 : value;
         return acc;
     }, {});
+
+/**
+ * @param value {number || string}
+ * @returns {string}
+ */
+export const replaceZeroWithEmptyString = (value) => (parseInt(value, 10) === 0 ? '' : value);
 
 /**
  * @param {string} search
@@ -926,3 +818,16 @@ export const getBlockingClientName = (clients, ip) => {
     }
     return ip;
 };
+
+/**
+ * @param {string[]} lines
+ * @returns {string[]}
+ */
+export const filterOutComments = (lines) => lines
+    .filter((line) => !line.startsWith(COMMENT_LINE_DEFAULT_TOKEN));
+
+/**
+ * @param {string} serviceId
+ * @returns {string}
+ */
+export const getServiceName = (serviceId) => SERVICES_ID_NAME_MAP[serviceId] || serviceId;

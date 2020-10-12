@@ -80,6 +80,9 @@ type clientsContainer struct {
 	// dhcpServer is used for looking up clients IP addresses by MAC addresses
 	dhcpServer *dhcpd.Server
 
+	// dnsServer is used for checking clients IP status access list status
+	dnsServer *dnsforward.Server
+
 	autoHosts *util.AutoHosts // get entries from system hosts-files
 
 	testing bool // if TRUE, this object is used for internal tests
@@ -404,11 +407,9 @@ func (clients *clientsContainer) check(c *Client) error {
 	}
 	sort.Strings(c.Tags)
 
-	if len(c.Upstreams) != 0 {
-		err := dnsforward.ValidateUpstreams(c.Upstreams)
-		if err != nil {
-			return fmt.Errorf("invalid upstream servers: %s", err)
-		}
+	err := dnsforward.ValidateUpstreams(c.Upstreams)
+	if err != nil {
+		return fmt.Errorf("invalid upstream servers: %s", err)
 	}
 
 	return nil

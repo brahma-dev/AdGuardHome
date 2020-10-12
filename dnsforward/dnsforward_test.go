@@ -267,7 +267,7 @@ func TestBlockedRequest(t *testing.T) {
 	addr := s.dnsProxy.Addr(proxy.ProtoUDP)
 
 	//
-	// Default blocking - REFUSED
+	// Default blocking - NULL IP
 	//
 	req := dns.Msg{}
 	req.Id = dns.Id()
@@ -280,7 +280,8 @@ func TestBlockedRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't talk to server %s: %s", addr, err)
 	}
-	assert.Equal(t, dns.RcodeRefused, reply.Rcode)
+	assert.Equal(t, dns.RcodeSuccess, reply.Rcode)
+	assert.True(t, reply.Answer[0].(*dns.A).A.Equal(net.ParseIP("0.0.0.0")))
 
 	err = s.Stop()
 	if err != nil {
@@ -442,7 +443,8 @@ func TestBlockCNAME(t *testing.T) {
 	req := createTestMessage("badhost.")
 	reply, err := dns.Exchange(req, addr.String())
 	assert.Nil(t, err, nil)
-	assert.Equal(t, dns.RcodeRefused, reply.Rcode)
+	assert.Equal(t, dns.RcodeSuccess, reply.Rcode)
+	assert.True(t, reply.Answer[0].(*dns.A).A.Equal(net.ParseIP("0.0.0.0")))
 
 	// 'whitelist.example.org' has a canonical name 'null.example.org' which is blocked by filters
 	//   but 'whitelist.example.org' is in a whitelist:
@@ -457,7 +459,8 @@ func TestBlockCNAME(t *testing.T) {
 	req = createTestMessage("example.org.")
 	reply, err = dns.Exchange(req, addr.String())
 	assert.Nil(t, err)
-	assert.Equal(t, dns.RcodeRefused, reply.Rcode)
+	assert.Equal(t, dns.RcodeSuccess, reply.Rcode)
+	assert.True(t, reply.Answer[0].(*dns.A).A.Equal(net.ParseIP("0.0.0.0")))
 
 	_ = s.Stop()
 }
@@ -912,50 +915,6 @@ func publicKey(priv interface{}) interface{} {
 	}
 }
 
-func TestIsBlockedIPAllowed(t *testing.T) {
-	a := &accessCtx{}
-	assert.True(t, a.Init([]string{"1.1.1.1", "2.2.0.0/16"}, nil, nil) == nil)
-
-	assert.True(t, !a.IsBlockedIP("1.1.1.1"))
-	assert.True(t, a.IsBlockedIP("1.1.1.2"))
-	assert.True(t, !a.IsBlockedIP("2.2.1.1"))
-	assert.True(t, a.IsBlockedIP("2.3.1.1"))
-}
-
-func TestIsBlockedIPDisallowed(t *testing.T) {
-	a := &accessCtx{}
-	assert.True(t, a.Init(nil, []string{"1.1.1.1", "2.2.0.0/16"}, nil) == nil)
-
-	assert.True(t, a.IsBlockedIP("1.1.1.1"))
-	assert.True(t, !a.IsBlockedIP("1.1.1.2"))
-	assert.True(t, a.IsBlockedIP("2.2.1.1"))
-	assert.True(t, !a.IsBlockedIP("2.3.1.1"))
-}
-
-func TestIsBlockedIPBlockedDomain(t *testing.T) {
-	a := &accessCtx{}
-	assert.True(t, a.Init(nil, nil, []string{"host1",
-		"host2",
-		"*.host.com",
-		"||host3.com^",
-	}) == nil)
-
-	// match by "host2.com"
-	assert.True(t, a.IsBlockedDomain("host1"))
-	assert.True(t, a.IsBlockedDomain("host2"))
-	assert.True(t, !a.IsBlockedDomain("host3"))
-
-	// match by wildcard "*.host.com"
-	assert.True(t, !a.IsBlockedDomain("host.com"))
-	assert.True(t, a.IsBlockedDomain("asdf.host.com"))
-	assert.True(t, a.IsBlockedDomain("qwer.asdf.host.com"))
-	assert.True(t, !a.IsBlockedDomain("asdf.zhost.com"))
-
-	// match by wildcard "||host3.com^"
-	assert.True(t, a.IsBlockedDomain("host3.com"))
-	assert.True(t, a.IsBlockedDomain("asdf.host3.com"))
-}
-
 func TestValidateUpstream(t *testing.T) {
 	invalidUpstreams := []string{"1.2.3.4.5",
 		"123.3.7m",
@@ -1005,31 +964,35 @@ func TestValidateUpstream(t *testing.T) {
 }
 
 func TestValidateUpstreamsSet(t *testing.T) {
+	// Empty upstreams array
+	var upstreamsSet []string
+	err := ValidateUpstreams(upstreamsSet)
+	assert.Nil(t, err, "empty upstreams array should be valid")
+
+	// Comment in upstreams array
+	upstreamsSet = []string{"# comment"}
+	err = ValidateUpstreams(upstreamsSet)
+	assert.Nil(t, err, "comments should not be validated")
+
 	// Set of valid upstreams. There is no default upstream specified
-	upstreamsSet := []string{"[/host.com/]1.1.1.1",
+	upstreamsSet = []string{"[/host.com/]1.1.1.1",
 		"[//]tls://1.1.1.1",
 		"[/www.host.com/]#",
 		"[/host.com/google.com/]8.8.8.8",
 		"[/host/]sdns://AQMAAAAAAAAAFDE3Ni4xMDMuMTMwLjEzMDo1NDQzINErR_JS3PLCu_iZEIbq95zkSV2LFsigxDIuUso_OQhzIjIuZG5zY3J5cHQuZGVmYXVsdC5uczEuYWRndWFyZC5jb20",
 	}
-	err := ValidateUpstreams(upstreamsSet)
-	if err == nil {
-		t.Fatalf("there is no default upstream")
-	}
+	err = ValidateUpstreams(upstreamsSet)
+	assert.NotNil(t, err, "there is no default upstream")
 
 	// Let's add default upstream
 	upstreamsSet = append(upstreamsSet, "8.8.8.8")
 	err = ValidateUpstreams(upstreamsSet)
-	if err != nil {
-		t.Fatalf("upstreams set is valid, but doesn't pass through validation cause: %s", err)
-	}
+	assert.Nilf(t, err, "upstreams set is valid, but doesn't pass through validation cause: %s", err)
 
 	// Let's add invalid upstream
 	upstreamsSet = append(upstreamsSet, "dhcp://fake.dns")
 	err = ValidateUpstreams(upstreamsSet)
-	if err == nil {
-		t.Fatalf("there is an invalid upstream in set, but it pass through validation")
-	}
+	assert.NotNil(t, err, "there is an invalid upstream in set, but it pass through validation")
 }
 
 func TestIpFromAddr(t *testing.T) {

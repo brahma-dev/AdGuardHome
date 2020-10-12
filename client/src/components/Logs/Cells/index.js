@@ -11,6 +11,7 @@ import {
     formatTime,
     getBlockingClientName,
     getFilterName,
+    getServiceName,
     processContent,
 } from '../../../helpers/helpers';
 import {
@@ -31,6 +32,7 @@ import ClientCell from './ClientCell';
 import '../Logs.css';
 import { toggleClientBlock } from '../../../actions/access';
 import { getBlockClientInfo, BUTTON_PREFIX } from './helpers';
+import { updateLogs } from '../../../actions/queryLogs';
 
 const Row = memo(({
     style,
@@ -48,21 +50,19 @@ const Row = memo(({
     const whitelistFilters = useSelector((state) => state.filtering.whitelistFilters, shallowEqual);
     const autoClients = useSelector((state) => state.dashboard.autoClients, shallowEqual);
 
-    const disallowed_clients = useSelector(
-        (state) => state.access.disallowed_clients,
-        shallowEqual,
-    );
-
     const clients = useSelector((state) => state.dashboard.clients);
 
     const onClick = () => {
-        if (!isSmallScreen) { return; }
+        if (!isSmallScreen) {
+            return;
+        }
         const {
             answer_dnssec,
             client,
             domain,
             elapsedMs,
             info,
+            info: { disallowed, disallowed_rule },
             reason,
             response,
             time,
@@ -74,6 +74,7 @@ const Row = memo(({
             rule,
             originalResponse,
             status,
+            service_name,
         } = rowProps;
 
         const hasTracker = !!tracker;
@@ -92,7 +93,7 @@ const Row = memo(({
         const isFiltered = checkFiltered(reason);
 
         const isBlocked = reason === FILTERED_STATUS.FILTERED_BLACK_LIST
-                    || reason === FILTERED_STATUS.FILTERED_BLOCKED_SERVICE;
+                || reason === FILTERED_STATUS.FILTERED_BLOCKED_SERVICE;
 
         const buttonType = isFiltered ? BLOCK_ACTIONS.UNBLOCK : BLOCK_ACTIONS.BLOCK;
         const onToggleBlock = () => {
@@ -111,8 +112,8 @@ const Row = memo(({
         const {
             confirmMessage,
             buttonKey: blockingClientKey,
-            type: blockType,
-        } = getBlockClientInfo(client, disallowed_clients);
+            isNotInAllowedList,
+        } = getBlockClientInfo(client, disallowed, disallowed_rule);
 
         const blockingForClientKey = isFiltered ? 'unblock_for_this_client_only' : 'block_for_this_client_only';
         const clientNameBlockingFor = getBlockingClientName(clients, client);
@@ -121,18 +122,40 @@ const Row = memo(({
             dispatch(toggleBlockingForClient(buttonType, domain, clientNameBlockingFor));
         };
 
-        const onBlockingClientClick = () => {
-            const message = `${blockType === BLOCK_ACTIONS.BLOCK ? t('adg_will_drop_dns_queries') : ''} ${t(confirmMessage, { ip: client })}`;
-            if (window.confirm(message)) {
-                dispatch(toggleClientBlock(blockType, client));
+        const onBlockingClientClick = async () => {
+            if (window.confirm(confirmMessage)) {
+                await dispatch(toggleClientBlock(client, disallowed, disallowed_rule));
+                await dispatch(updateLogs());
+                setModalOpened(false);
             }
         };
+
+        const blockButton = <button
+                className={classNames('title--border text-center button-action--arrow-option', { 'bg--danger': !isBlocked })}
+                onClick={onToggleBlock}>
+            {t(buttonType)}
+        </button>;
+
+        const blockForClientButton = <button
+                className='text-center font-weight-bold py-2 button-action--arrow-option'
+                onClick={onBlockingForClientClick}>
+            {t(blockingForClientKey)}
+        </button>;
+
+        const blockClientButton = <button
+                className='text-center font-weight-bold py-2 button-action--arrow-option'
+                onClick={onBlockingClientClick}
+                disabled={isNotInAllowedList}>
+            {t(blockingClientKey)}
+        </button>;
 
         const detailedData = {
             time_table_header: formatTime(time, LONG_TIME_FORMAT),
             date: formatDateTime(time, DEFAULT_SHORT_DATE_FORMAT_OPTIONS),
             encryption_status: isBlocked
                 ? <div className="bg--danger">{requestStatus}</div> : requestStatus,
+            ...(FILTERED_STATUS.FILTERED_BLOCKED_SERVICE && service_name
+                && { service_name: getServiceName(service_name) }),
             domain,
             type_table_header: type,
             protocol,
@@ -140,12 +163,12 @@ const Row = memo(({
             table_name: tracker?.name,
             category_label: hasTracker && captitalizeWords(tracker.category),
             tracker_source: hasTracker && sourceData
-                        && <a
-                                href={sourceData.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="link--green">{sourceData.name}
-                        </a>,
+                    && <a
+                            href={sourceData.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="link--green">{sourceData.name}
+                    </a>,
             response_details: 'title',
             install_settings_dns: upstream,
             elapsed: formattedElapsedMs,
@@ -162,12 +185,9 @@ const Row = memo(({
             source_label: source,
             validated_with_dnssec: dnssec_enabled ? Boolean(answer_dnssec) : false,
             original_response: originalResponse?.join('\n'),
-            [BUTTON_PREFIX + buttonType]: <div onClick={onToggleBlock}
-                                               className={classNames('title--border text-center', {
-                                                   'bg--danger': isBlocked,
-                                               })}>{t(buttonType)}</div>,
-            [BUTTON_PREFIX + blockingForClientKey]: <div onClick={onBlockingForClientClick} className='text-center font-weight-bold py-2'>{t(blockingForClientKey)}</div>,
-            [BUTTON_PREFIX + blockingClientKey]: <div onClick={onBlockingClientClick} className='text-center font-weight-bold py-2'>{t(blockingClientKey)}</div>,
+            [BUTTON_PREFIX + buttonType]: blockButton,
+            [BUTTON_PREFIX + blockingForClientKey]: blockForClientButton,
+            [BUTTON_PREFIX + blockingClientKey]: blockClientButton,
         };
 
         setDetailedDataCurrent(processContent(detailedData));
@@ -219,6 +239,7 @@ Row.propTypes = {
         rule: propTypes.string,
         originalResponse: propTypes.array,
         status: propTypes.string.isRequired,
+        service_name: propTypes.string,
     }).isRequired,
     isSmallScreen: propTypes.bool.isRequired,
     setDetailedDataCurrent: propTypes.func.isRequired,

@@ -63,10 +63,6 @@ body {
     cursor: not-allowed;
 }
 
-.select--no-warning {
-    margin-bottom: 1.375rem;
-}
-
 .button-action {
     visibility: hidden;
 }

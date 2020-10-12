@@ -1,13 +1,12 @@
 import React, { Fragment } from 'react';
 import PropTypes from 'prop-types';
 import { Trans } from 'react-i18next';
-import classNames from 'classnames';
 import { createOnBlurHandler } from './helpers';
 import { R_UNIX_ABSOLUTE_PATH, R_WIN_ABSOLUTE_PATH } from './constants';
 
 export const renderField = (props, elementType) => {
     const {
-        input, id, className, placeholder, type, disabled, normalizeOnBlur,
+        input, id, className, placeholder, type, disabled, normalizeOnBlur, onScroll,
         autoComplete, meta: { touched, error }, min, max, step,
     } = props;
 
@@ -25,6 +24,7 @@ export const renderField = (props, elementType) => {
         max,
         step,
         onBlur,
+        onScroll,
     });
 
     return (
@@ -48,6 +48,7 @@ renderField.propTypes = {
     min: PropTypes.number,
     max: PropTypes.number,
     step: PropTypes.number,
+    onScroll: PropTypes.func,
     meta: PropTypes.shape({
         touched: PropTypes.bool,
         error: PropTypes.string,
@@ -155,31 +156,24 @@ renderRadioField.propTypes = {
     }).isRequired,
 };
 
-export const renderCheckboxField = ({
+export const CheckboxField = ({
     input,
     placeholder,
     subtitle,
     disabled,
     onClick,
     modifier = 'checkbox--form',
-    checked,
     meta: { touched, error },
 }) => <>
     <label className={`checkbox ${modifier}`} onClick={onClick}>
         <span className="checkbox__marker" />
-        <input {...input} type="checkbox" className="checkbox__input" disabled={disabled}
-               checked={input.checked || checked} />
+        <input {...input} type="checkbox" className="checkbox__input" disabled={disabled} />
         <span className="checkbox__label">
-                        <span className="checkbox__label-text checkbox__label-text--long">
-                            <span className="checkbox__label-title">{placeholder}</span>
-                            {subtitle
-                            && <span
-                                className="checkbox__label-subtitle"
-                                dangerouslySetInnerHTML={{ __html: subtitle }}
-
-                            />}
-                        </span>
-                    </span>
+            <span className="checkbox__label-text checkbox__label-text--long">
+                <span className="checkbox__label-title">{placeholder}</span>
+                {subtitle && <span className="checkbox__label-subtitle">{subtitle}</span>}
+            </span>
+        </span>
     </label>
     {!disabled
     && touched
@@ -187,10 +181,10 @@ export const renderCheckboxField = ({
     && <span className="form__message form__message--error"><Trans>{error}</Trans></span>}
 </>;
 
-renderCheckboxField.propTypes = {
+CheckboxField.propTypes = {
     input: PropTypes.object.isRequired,
     placeholder: PropTypes.string,
-    subtitle: PropTypes.string,
+    subtitle: PropTypes.node,
     disabled: PropTypes.bool,
     onClick: PropTypes.func,
     modifier: PropTypes.string,
@@ -208,13 +202,10 @@ export const renderSelectField = ({
     label,
 }) => {
     const showWarning = touched && error;
-    const selectClass = classNames('form-control custom-select', {
-        'select--no-warning': !showWarning,
-    });
 
     return <>
         {label && <label><Trans>{label}</Trans></label>}
-        <select {...input} className={selectClass}>{children}</select>
+        <select {...input} className='form-control custom-select'>{children}</select>
         {showWarning
         && <span className="form__message form__message--error form__message--left-pad"><Trans>{error}</Trans></span>}
     </>;

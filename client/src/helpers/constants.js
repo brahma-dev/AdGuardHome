@@ -53,6 +53,7 @@ export const REPOSITORY = {
 export const PRIVACY_POLICY_LINK = 'https://adguard.com/privacy/home.html';
 export const PORT_53_FAQ_LINK = 'https://github.com/AdguardTeam/AdGuardHome/wiki/FAQ#bindinuse';
 export const UPSTREAM_CONFIGURATION_WIKI_LINK = 'https://github.com/AdguardTeam/AdGuardHome/wiki/Configuration#upstreams';
+export const FILTERS_LINK = '#filters';
 
 export const GETTING_STARTED_LINK = 'https://github.com/AdguardTeam/AdGuardHome/wiki/Getting-Started#update';
 
@@ -280,6 +281,11 @@ export const SERVICES = [
     },
 ];
 
+export const SERVICES_ID_NAME_MAP = SERVICES.reduce((acc, { id, name }) => {
+    acc[id] = name;
+    return acc;
+}, {});
+
 export const ENCRYPTION_SOURCE = {
     PATH: 'path',
     CONTENT: 'content',
@@ -351,6 +357,10 @@ export const RESPONSE_FILTER = {
         QUERY: 'blocked',
         LABEL: 'show_blocked_responses',
     },
+    BLOCKED_SERVICES: {
+        QUERY: 'blocked_services',
+        LABEL: 'blocked_services',
+    },
     BLOCKED_THREATS: {
         QUERY: 'blocked_safebrowsing',
         LABEL: 'blocked_threats',
@@ -397,7 +407,7 @@ export const FILTERED_STATUS_TO_META_MAP = {
         COLOR: QUERY_STATUS_COLORS.WHITE,
     },
     [FILTERED_STATUS.FILTERED_BLOCKED_SERVICE]: {
-        LABEL: RESPONSE_FILTER.BLOCKED.LABEL,
+        LABEL: 'blocked_service',
         COLOR: QUERY_STATUS_COLORS.RED,
     },
     [FILTERED_STATUS.FILTERED_SAFE_SEARCH]: {
@@ -468,12 +478,6 @@ export const DNS_REQUEST_OPTIONS = {
     PARALLEL: 'parallel',
     FASTEST_ADDR: 'fastest_addr',
     LOAD_BALANCING: '',
-};
-
-export const IP_MATCH_LIST_STATUS = {
-    NOT_FOUND: 'NOT_FOUND', // not found in the list
-    EXACT: 'EXACT', // found exact match (including the match of short and long forms)
-    CIDR: 'CIDR', // the ip is in the specified CIDR range
 };
 
 export const DHCP_FORM_NAMES = {
@@ -568,3 +572,6 @@ export const CACHE_CONFIG_FIELDS = {
     cache_ttl_min: 'cache_ttl_min',
     cache_ttl_max: 'cache_ttl_max',
 };
+
+export const isFirefox = navigator.userAgent.indexOf('Firefox') !== -1;
+export const COMMENT_LINE_DEFAULT_TOKEN = '#';

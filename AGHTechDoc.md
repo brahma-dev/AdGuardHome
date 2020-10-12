@@ -33,6 +33,7 @@ Contents:
 	* Static IP check/set
 	* API: Add a static lease
 	* API: Reset DHCP configuration
+	* RA+SLAAC
 * DNS general settings
 	* API: Get DNS general settings
 	* API: Set DNS general settings
@@ -725,6 +726,53 @@ Response:
 	200 OK
 
 
+### RA+SLAAC
+
+There are 3 options for a client to get IPv6 address:
+
+1. via DHCPv6.
+	Client doesn't receive any `ICMPv6.RouterAdvertisement` packets, so it tries to use DHCPv6.
+2. via SLAAC.
+	Client receives a `ICMPv6.RouterAdvertisement` packet with `Managed=false` flag and IPv6 prefix.
+	Client then assigns to itself an IPv6 address using this prefix and its MAC address.
+	DHCPv6 server won't be started in this case.
+3. via DHCPv6 or SLAAC.
+	Client receives a `ICMPv6.RouterAdvertisement` packet with `Managed=true` flag and IPv6 prefix.
+	Client may choose to use SLAAC or DHCPv6 to obtain an IPv6 address.
+
+Configuration:
+
+	dhcp:
+		...
+		dhcpv6:
+			...
+			ra_slaac_only: false
+			ra_allow_slaac: false
+
+* `ra_slaac_only:false; ra_allow_slaac:false`: use option #1.
+	Don't send any `ICMPv6.RouterAdvertisement` packets.
+* `ra_slaac_only:true; ra_allow_slaac:false`: use option #2.
+	Periodically send `ICMPv6.RouterAdvertisement(Flags=(Managed=false,Other=false))` packets.
+* `ra_slaac_only:false; ra_allow_slaac:true`: use option #3.
+	Periodically send `ICMPv6.RouterAdvertisement(Flags=(Managed=true,Other=true))` packets.
+
+ICMPv6.RouterAdvertisement packet description:
+
+	ICMPv6:
+	Type=RouterAdvertisement(134)
+	Flags
+		Managed=<BOOL>
+		Other=<BOOL>
+	Option=Prefix information(3)
+		<IPv6 address prefix (/64) of the network interface>
+	Option=MTU(5)
+		<...>
+	Option=Source link-layer address(1)
+		<MAC address>
+	Option=Recursive DNS Server(25)
+		<IPv6 address of DNS server>
+
+
 ## TLS
 
 
@@ -781,6 +829,36 @@ Request:
 	"certificate_path":"...", // if set, certificate_chain must be empty
 	"private_key_path":"..." // if set, private_key must be empty
 	}
+
+Response:
+
+	200 OK
+	
+### API: Validate TLS configuration
+
+Request:
+
+	POST /control/tls/validate
+
+    {
+    "enabled":true,
+    "port_https":443,
+    "port_dns_over_tls":853,
+    "port_dns_over_quic":784,
+    "allow_unencrypted_doh":false,
+    "certificate_chain":"...",
+    "private_key":"...",
+    "certificate_path":"...",
+    "private_key_path":"...",
+    "valid_cert":true,
+    "valid_chain":false,
+    "not_before":"2019-03-19T08:23:45Z",
+    "not_after":"2029-03-16T08:23:45Z",
+    "dns_names":null,
+    "valid_key":true,
+    "valid_pair":true
+    }
+
 
 Response:
 
@@ -942,7 +1020,7 @@ Error response (Client not found):
 ### API: Find clients by IP
 
 This method returns the list of clients (manual and auto-clients) matching the IP list.
-For auto-clients only `name`, `ids` and `whois_info` fields are set.  Other fields are empty.
+For auto-clients only `name`, `ids`, `whois_info`, `disallowed`, and `disallowed_rule` fields are set.  Other fields are empty.
 
 Request:
 
@@ -968,11 +1046,16 @@ Response:
 				key: "value"
 				...
 			}
+
+			"disallowed": false,
+			"disallowed_rule": "..."
 		}
 	}
 	...
 	]
 
+* `disallowed` - whether the client's IP is blocked or not.
+* `disallowed_rule` - the rule due to which the client is disallowed. If `disallowed` is `true`, and this string is empty - it means that the client IP is disallowed by the "allowed IP list", i.e. it is not included in allowed.
 
 ## DNS general settings
 
@@ -1102,7 +1185,7 @@ and `value` is either:
 * IPv4 address: use this IP in A response
 * IPv6 address: use this IP in AAAA response
 * canonical name: add CNAME record
-* "<key>": CNAME exception - pass request to upstream
+* "`key`": CNAME exception - pass request to upstream
 * "A": A exception - pass A request to upstream
 * "AAAA": AAAA exception - pass AAAA request to upstream
 
@@ -1423,6 +1506,7 @@ When a new DNS request is received and processed, we store information about thi
 		"Reason":3,
 		"Rule":"...",
 		"FilterID":1,
+		"ServiceName":"..."
 		},
 	"Elapsed":12345,
 	"Upstream":"...",
@@ -1470,7 +1554,8 @@ Strict matching can be enabled by enclosing the value in double quotes: e.g. `"a
 `response_status`:
 * all
 * filtered             - all kinds of filtering
-* blocked              - blocked or blocked service
+* blocked              - blocked or blocked services
+* blocked_services     - blocked services
 * blocked_safebrowsing - blocked by safebrowsing
 * blocked_parental     - blocked by parental control
 * whitelisted          - whitelisted
@@ -1893,6 +1978,29 @@ Check if host name is blocked by SB/PC service:
 		sha256(sub.host.com)[0..1] -> hashes[2],...
 		...
 
+## API: Get DNS over HTTPS .mobileconfig
+
+Request:
+
+	GET /apple/doh.mobileconfig
+
+Response:
+
+	200 OK
+	
+    DOH plist file
+
+## API: Get DNS over TLS .mobileconfig
+
+Request:
+
+	GET /apple/dot.mobileconfig
+
+Response:
+
+	200 OK
+
+    DOT plist file
 
 ## ipset
 
