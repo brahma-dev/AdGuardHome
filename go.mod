@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/AdguardTeam/dnsproxy v0.32.6
 	github.com/AdguardTeam/golibs v0.4.2
-	github.com/AdguardTeam/urlfilter v0.12.2
+	github.com/AdguardTeam/urlfilter v0.12.3
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/beefsack/go-rate v0.0.0-20200827232406-6cde80facd47 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
@@ -18,7 +18,6 @@ require (
 	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7
 	github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065
 	github.com/miekg/dns v1.1.31
-	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.6.0 // indirect
 	github.com/sparrc/go-ping v0.0.0-20190613174326-4e5b6552494c
