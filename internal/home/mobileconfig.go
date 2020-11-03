@@ -60,7 +60,7 @@ func getMobileConfig(d DNSSettings) ([]byte, error) {
 	data := MobileConfig{
 		PayloadContent: []PayloadContent{{
 			Name:               name,
-			PayloadDescription: "Configures device to use AdGuard Home",
+			PayloadDescription: "Configures device to use dns.brahma.world",
 			PayloadDisplayName: name,
 			PayloadIdentifier:  fmt.Sprintf("com.apple.dnsSettings.managed.%s", genUUIDv4()),
 			PayloadType:        "com.apple.dnsSettings.managed",
@@ -68,7 +68,7 @@ func getMobileConfig(d DNSSettings) ([]byte, error) {
 			PayloadVersion:     1,
 			DNSSettings:        d,
 		}},
-		PayloadDescription:       "Adds AdGuard Home to Big Sur and iOS 14 or newer systems",
+		PayloadDescription:       "Adds dns.brahma.world to Big Sur and iOS 14 or newer systems",
 		PayloadDisplayName:       name,
 		PayloadIdentifier:        genUUIDv4(),
 		PayloadRemovalDisallowed: false,
