@@ -2,7 +2,6 @@ package home
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 
 	uuid "github.com/satori/go.uuid"
@@ -98,16 +97,9 @@ func handleMobileConfigDoh(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleMobileConfigDot(w http.ResponseWriter, r *http.Request) {
-	var err error
-
-	var host string
-	host, _, err = net.SplitHostPort(r.Host)
-	if err != nil {
-		httpError(w, http.StatusBadRequest, "getting host: %s", err)
-	}
 
 	handleMobileConfig(w, DNSSettings{
 		DNSProtocol: dnsProtoTLS,
-		ServerName:  host,
+		ServerName:  r.Host,
 	})
 }
